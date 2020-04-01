@@ -1,9 +1,11 @@
 import re
 import os
+import sys
 import glob
 import shutil
 import requests
 import argparse
+import subprocess
 from urllib.parse import urlencode
 from bs4 import BeautifulSoup
 from fuzzywuzzy import fuzz
@@ -14,47 +16,48 @@ class Yify:
     def __init__(self):
         parser = argparse.ArgumentParser()
         parser.add_argument('movie', type=str, action='store')
-        parser.add_argument(
-            '--debug', '-d', action='store_true', default=False)
-        parser.add_argument('--write', '-w', action='store_true', default=False)
-        parser.add_argument('--lang', '-l', action='store', default="English")
+        parser.add_argument('--lang', '-l', type=str, action='store', default="English")
+        parser.add_argument('--debug', '-d', action='store_true', default=False)
+        parser.add_argument('--resub', '-r', action='store_true', default=False)
         args = parser.parse_args()
         self.movie = args.movie
         self.lang = args.lang
         self.debug = args.debug
-        self.write = args.write
+        self.resub_boolean = args.resub
+
         self.base_url = 'https://www.yifysubtitles.com/'
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (X11; Linux i686) AppleWebKit/537.17 (KHTML, like Gecko) Chrome/24.0.1312.27 Safari/537.17'
         }
+
         if self.debug:
             requests.get = ResponseTimer(requests.get)
         self.main()
+        if args.resub:
+            subprocess.call(f"resub {self.filename}", shell=True)
 
     def main(self):
-        url = self.url('search')
-        payload = {'q': self.movie}
+        try:
+            url = self.url('search')
+            payload = {'q': self.movie}
+            response = requests.get(url=url, headers=self.headers, params=urlencode(payload))
 
-        response = requests.get(
-            url=url, headers=self.headers, params=urlencode(payload))
+            url = self.url(self.search_movie(response)['endpoint'])
+            response = requests.get(url=url, headers=self.headers)
 
-        url = self.url(self.api1(response)['endpoint'])
-        response = requests.get(url=url, headers=self.headers)
-        subtitles = self.api2(response)
-        # print(subtitles)
-        best_rating = max([subtitle["rating"] for subtitle in subtitles])
-        best_subtitles = [subtitle["endpoint"] for subtitle in subtitles if subtitle["rating"] == best_rating]
+            subtitles = self.search_movie(response)
+            best_rating = max([subtitle["rating"] for subtitle in subtitles])
+            best_subtitles = [subtitle["endpoint"] for subtitle in subtitles if subtitle["rating"] == best_rating]
 
-        self.downloader(best_subtitles[0].replace('/subtitles', 'subtitle'))
+            self.downloader(best_subtitles[0].replace('/subtitles', 'subtitle'))
 
-    def writer(self, string):
-        if self.debug:
-            filename = f"html_dump.html"
-            with open(filename, "w") as f:
-                print(f"writing to {filename}")
-                f.write(string)
+        except KeyboardInterrupt:
+            sys.exit()
+        except Exception as e:
+            print(e)
 
-    def api1(self, response):
+
+    def search_movie(self, response):
         soup = BeautifulSoup(response.text, 'html.parser')
         movies = soup.findAll("div", {"class": "media-body"})
         ratios = {}
@@ -68,13 +71,14 @@ class Yify:
                 ratios[ratio] = {"name": name, "endpoint": endpoint}
 
             best_match = max(ratios.keys())
-            print(f"best match for {self.movie!r} found: {ratios[best_match]['name']}")
+            print(f"Best match for {self.movie!r} found: {ratios[best_match]['name']}")
             return ratios[best_match]
 
         else:
-            print("no movie found")
+            print("No movie found")
+            sys.exit()
 
-    def api2(self, response):
+    def search_subtitle(self, response):
         soup = BeautifulSoup(response.text, 'html.parser')
         movies = soup.findAll("tbody")[0].findAll("tr")
         subtitles = []
@@ -97,20 +101,22 @@ class Yify:
                 #subtitles dictionary
                 subtitle = {'rating': rating, 'endpoint': endpoint}
                 subtitles.append(subtitle)
+        if subtitles:
+            return subtitles
 
-        return subtitles
+        else:
+            print("No subtitles found")
+            sys.exit
 
     def downloader(self, endpoint):
         url = self.url(endpoint + '.zip')
         with requests.get(url=url, stream=True, allow_redirects=True) as response:
-            filename = self.get_filename(response.headers.get('content-disposition'))
-            with open(filename, 'wb') as zipfile:
-                shutil.copyfileobj(response.raw, zipfile)
+            if response.ok:
+                self.filename = self.get_filename(response.headers.get('content-disposition'))
+                with open(self.filename, 'wb') as zipfile:
+                    shutil.copyfileobj(response.raw, zipfile)
 
     def get_filename(self, content_disposition):
-        """
-        Get filename from content-disposition
-        """
         if not content_disposition:
             return None
         fname = re.findall('filename=(.+)', content_disposition)
