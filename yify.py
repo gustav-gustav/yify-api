@@ -5,12 +5,11 @@ import glob
 import shutil
 import requests
 import argparse
-import subprocess
-from bs4 import BeautifulSoup
-from urllib.parse import urlencode
-from decorators import ResponseTimer
 from unzip import unzip
 from resub import Resub
+from bs4 import BeautifulSoup
+from decorators import ResponseTimer
+from urllib.parse import urlencode, urlparse
 try:
     from fuzzywuzzy import fuzz
 except Exception as e:
@@ -25,12 +24,13 @@ class Yify:
         parser.add_argument('--lang', '-l', type=str, action='store', default="English")
         parser.add_argument('--debug', '-d', action='store_true', default=False)
         parser.add_argument('--resub', '-r', action='store_true', default=False)
+        parser.add_argument('--no', '-n', action='store_true', default=False)
         args = parser.parse_args()
         self.movie = args.movie
         self.lang = args.lang
         self.debug = args.debug
-        self.resub_boolean = args.resub
-
+        self.resub = args.resub
+        self.no_download = args.no
         self.base_url = 'https://www.yifysubtitles.com/'
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (X11; Linux i686) AppleWebKit/537.17 (KHTML, like Gecko) Chrome/24.0.1312.27 Safari/537.17'
@@ -39,12 +39,6 @@ class Yify:
         if self.debug:
             requests.get = ResponseTimer(requests.get)
         self.main()
-        print(f"Unzipping {self.filename}")
-        #subprocess.call(f"python ~/files/cmd/zz.py {self.filename}", shell=True)
-        unzip(self.filename)
-        if args.resub:
-            Resub()
-            #subprocess.call("python ~/files/cmd/resub.py", shell=True)
 
     def main(self):
         try:
@@ -59,7 +53,12 @@ class Yify:
             best_rating = max([subtitle["rating"] for subtitle in subtitles])
             best_subtitles = [subtitle["endpoint"] for subtitle in subtitles if subtitle["rating"] == best_rating]
 
-            self.downloader(best_subtitles[0].replace('/subtitles', 'subtitle'))
+            if not self.no_download:
+                self.downloader(best_subtitles[0].replace('/subtitles', 'subtitle'))
+                print(f"Unzipping {self.filename}")
+                unzip(self.filename)
+                if self.resub:
+                    Resub()
 
         except KeyboardInterrupt:
             sys.exit()
@@ -115,7 +114,7 @@ class Yify:
             return subtitles
 
         else:
-            print("No subtitles found")
+            print(f"No subtitles found for language {self.lang}")
             sys.exit
 
     def downloader(self, endpoint):
