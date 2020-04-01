@@ -9,8 +9,8 @@ import subprocess
 from bs4 import BeautifulSoup
 from urllib.parse import urlencode
 from decorators import ResponseTimer
-from zz import unzip
-import resub
+from unzip import unzip
+from resub import Resub
 try:
     from fuzzywuzzy import fuzz
 except Exception as e:
@@ -43,7 +43,8 @@ class Yify:
         #subprocess.call(f"python ~/files/cmd/zz.py {self.filename}", shell=True)
         unzip(self.filename)
         if args.resub:
-            subprocess.call("python ~/files/cmd/resub.py", shell=True)
+            Resub()
+            #subprocess.call("python ~/files/cmd/resub.py", shell=True)
 
     def main(self):
         try:

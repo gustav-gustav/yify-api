@@ -17,4 +17,4 @@ def unzip(zip=None):
         print('.zip extension file required')
 
 if __name__ == "___main__":
-    unzipper()
+    unzip()
