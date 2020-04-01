@@ -1,6 +1,7 @@
 import re
 import os
 import glob
+import shutil
 import requests
 import argparse
 from urllib.parse import urlencode
@@ -23,9 +24,6 @@ class Yify:
         self.debug = args.debug
         self.write = args.write
         self.base_url = 'https://www.yifysubtitles.com/'
-        self.endpoint = 'search'
-        self.url = f"{self.base_url}{self.endpoint}"
-        self.payload = {'q': self.movie}
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (X11; Linux i686) AppleWebKit/537.17 (KHTML, like Gecko) Chrome/24.0.1312.27 Safari/537.17'
         }
@@ -34,18 +32,20 @@ class Yify:
         self.main()
 
     def main(self):
-        response = requests.get(
-            url=self.url, headers=self.headers, params=urlencode(self.payload))
+        url = self.url('search')
+        payload = {'q': self.movie}
 
-        self.endpoint = self.api1(response)['endpoint']
-        self.url = f"{self.base_url}{self.endpoint}"
-        response = requests.get(self.url, headers=self.headers)
+        response = requests.get(
+            url=url, headers=self.headers, params=urlencode(payload))
+
+        url = self.url(self.api1(response)['endpoint'])
+        response = requests.get(url=url, headers=self.headers)
         subtitles = self.api2(response)
         # print(subtitles)
         best_rating = max([subtitle["rating"] for subtitle in subtitles])
         best_subtitles = [subtitle["endpoint"] for subtitle in subtitles if subtitle["rating"] == best_rating]
 
-        self.downloader(best_subtitles[0])
+        self.downloader(best_subtitles[0].replace('/subtitles', 'subtitle'))
 
     def writer(self, string):
         if self.debug:
@@ -101,7 +101,25 @@ class Yify:
         return subtitles
 
     def downloader(self, endpoint):
+        url = self.url(endpoint + '.zip')
+        with requests.get(url=url, stream=True, allow_redirects=True) as response:
+            filename = self.get_filename(response.headers.get('content-disposition'))
+            with open(filename, 'wb') as zipfile:
+                shutil.copyfileobj(response.raw, zipfile)
 
+    def get_filename(self, content_disposition):
+        """
+        Get filename from content-disposition
+        """
+        if not content_disposition:
+            return None
+        fname = re.findall('filename=(.+)', content_disposition)
+        if len(fname) == 0:
+            return None
+        return fname[0]
+
+    def url(self, endpoint):
+        return f"{self.base_url}{endpoint}"
 
 
 if __name__ == "__main__":
