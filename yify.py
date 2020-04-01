@@ -15,9 +15,13 @@ class Yify:
         parser.add_argument('movie', type=str, action='store')
         parser.add_argument(
             '--debug', '-d', action='store_true', default=False)
+        parser.add_argument('--write', '-w', action='store_true', default=False)
+        parser.add_argument('--lang', '-l', action='store', default="English")
         args = parser.parse_args()
-        self.debug = args.debug
         self.movie = args.movie
+        self.lang = args.lang
+        self.debug = args.debug
+        self.write = args.write
         self.base_url = 'https://www.yifysubtitles.com/'
         self.endpoint = 'search'
         self.url = f"{self.base_url}{self.endpoint}"
@@ -31,21 +35,26 @@ class Yify:
 
     def main(self):
         response = requests.get(
-            url=self.base_url, headers=self.headers, params=urlencode(self.payload))
-        # self.writer(self.res.text)
-        movie_object = self.extractor(response)
+            url=self.url, headers=self.headers, params=urlencode(self.payload))
 
-        self.endpoint = movie_object['endpoint']
+        self.endpoint = self.api1(response)['endpoint']
         self.url = f"{self.base_url}{self.endpoint}"
-        response = requests.get(self.url)
+        response = requests.get(self.url, headers=self.headers)
+        subtitles = self.api2(response)
+        # print(subtitles)
+        best_rating = max([subtitle["rating"] for subtitle in subtitles])
+        best_subtitles = [subtitle["endpoint"] for subtitle in subtitles if subtitle["rating"] == best_rating]
+
+        self.downloader(best_subtitles[0])
 
     def writer(self, string):
         if self.debug:
             filename = f"html_dump.html"
             with open(filename, "w") as f:
+                print(f"writing to {filename}")
                 f.write(string)
 
-    def extractor(self, response):
+    def api1(self, response):
         soup = BeautifulSoup(response.text, 'html.parser')
         movies = soup.findAll("div", {"class": "media-body"})
         ratios = {}
@@ -64,6 +73,35 @@ class Yify:
 
         else:
             print("no movie found")
+
+    def api2(self, response):
+        soup = BeautifulSoup(response.text, 'html.parser')
+        movies = soup.findAll("tbody")[0].findAll("tr")
+        subtitles = []
+        for movie in movies:
+            tds = movie.findAll("td")
+            #getting language index 1
+            flag_cell = tds[1]
+            language = flag_cell.findAll("span", {"class": "sub-lang"})[0].text
+            if language == self.lang:
+                #getting rating index 0
+                rating_cell = tds[0]
+                span = rating_cell.findAll("span", {"class": "label label-success"})
+                if span:
+                    rating = int(span[0].text)
+                else:
+                    rating = 0
+                #getting endpoint index 5
+                download_cell = tds[5].findAll("a", {"class": "subtitle-download"})
+                endpoint = download_cell[0]["href"]
+                #subtitles dictionary
+                subtitle = {'rating': rating, 'endpoint': endpoint}
+                subtitles.append(subtitle)
+
+        return subtitles
+
+    def downloader(self, endpoint):
+
 
 
 if __name__ == "__main__":
