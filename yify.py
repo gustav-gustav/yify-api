@@ -6,10 +6,16 @@ import shutil
 import requests
 import argparse
 import subprocess
-from urllib.parse import urlencode
 from bs4 import BeautifulSoup
-from fuzzywuzzy import fuzz
+from urllib.parse import urlencode
 from decorators import ResponseTimer
+from zz import unzip
+import resub
+try:
+    from fuzzywuzzy import fuzz
+except Exception as e:
+    print("install fuzzywuzzy with pip install fuzzywuzzy[speedup]")
+    sys.exit()
 
 
 class Yify:
@@ -33,8 +39,11 @@ class Yify:
         if self.debug:
             requests.get = ResponseTimer(requests.get)
         self.main()
+        print(f"Unzipping {self.filename}")
+        #subprocess.call(f"python ~/files/cmd/zz.py {self.filename}", shell=True)
+        unzip(self.filename)
         if args.resub:
-            subprocess.call(f"resub {self.filename}", shell=True)
+            subprocess.call("python ~/files/cmd/resub.py", shell=True)
 
     def main(self):
         try:
@@ -45,7 +54,7 @@ class Yify:
             url = self.url(self.search_movie(response)['endpoint'])
             response = requests.get(url=url, headers=self.headers)
 
-            subtitles = self.search_movie(response)
+            subtitles = self.search_subtitle(response)
             best_rating = max([subtitle["rating"] for subtitle in subtitles])
             best_subtitles = [subtitle["endpoint"] for subtitle in subtitles if subtitle["rating"] == best_rating]
 
@@ -75,7 +84,7 @@ class Yify:
             return ratios[best_match]
 
         else:
-            print("No movie found")
+            print("No movie found in search")
             sys.exit()
 
     def search_subtitle(self, response):
@@ -113,6 +122,7 @@ class Yify:
         with requests.get(url=url, stream=True, allow_redirects=True) as response:
             if response.ok:
                 self.filename = self.get_filename(response.headers.get('content-disposition'))
+                print(f"Downloading {self.filename}")
                 with open(self.filename, 'wb') as zipfile:
                     shutil.copyfileobj(response.raw, zipfile)
 
