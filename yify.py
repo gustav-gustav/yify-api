@@ -74,8 +74,7 @@ class Yify:
             for movie in movies:
                 for match in movie.findAll("a", href=True):
                     endpoint = match["href"]
-                name_tag = movie.findAll("h3", {"itemprop": "name"})
-                name = name_tag[0].text
+                name = movie.findAll("h3", {"itemprop": "name"})[0].text
                 ratio = fuzz.ratio(self.movie.lower(), name.lower())
                 ratios[ratio] = {"name": name, "endpoint": endpoint}
 
@@ -125,6 +124,9 @@ class Yify:
                 print(f"Downloading {self.filename}")
                 with open(self.filename, 'wb') as zipfile:
                     shutil.copyfileobj(response.raw, zipfile)
+            else:
+                print(f"Request returned status code {response.status_code}")
+                sys.exit()
 
     def get_filename(self, content_disposition):
         if not content_disposition:

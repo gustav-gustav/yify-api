@@ -28,6 +28,7 @@ class ResponseTimer(Timer):
             endpoint += parsed.params
         if parsed.query:
             endpoint += parsed.query
+        endpoint = endpoint.replace("//", "/")
         print(f"{self.value.status_code}@{endpoint!r} {self.string_elapsed}")
 
 
