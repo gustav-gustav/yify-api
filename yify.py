@@ -12,7 +12,7 @@ from decorators import ResponseTimer
 from urllib.parse import urlencode, urlparse
 try:
     from fuzzywuzzy import fuzz
-except Exception as e:
+except ImportError:
     print("install fuzzywuzzy with pip install fuzzywuzzy[speedup]")
     sys.exit()
 

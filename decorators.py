@@ -3,17 +3,6 @@ from functools import wraps
 from urllib.parse import urlparse
 
 
-def timer(function):
-    @wraps(function)
-    def wrapper_timer(*args, **kwargs):
-        start = perf_counter()
-        value = function(*args, **kwargs)
-        elapsed = float(f"{(perf_counter() - start):.2f}")
-        print(f'{function.__name__!r} finished in: {elapsed}')
-        return value
-    return wrapper_timer
-
-
 class Timer:
     def __init__(self, function):
         self.function = function
@@ -40,14 +29,6 @@ class ResponseTimer(Timer):
         if parsed.query:
             endpoint += parsed.query
         print(f"{self.value.status_code}@{endpoint!r} {self.string_elapsed}")
-
-
-def sleeper(function):
-    @wraps(function)
-    def wrapper(*args, **kwargs):
-        print(f'sleeping for {args[0]} secs')
-        function(args[0])
-    return wrapper
 
 
 def conditional_decorator(decoration, member):
