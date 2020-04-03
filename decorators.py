@@ -1,35 +1,46 @@
-from time import perf_counter
+from time import perf_counter, strftime
 from functools import wraps
 from urllib.parse import urlparse
 
 
 class Timer:
-    def __init__(self, function):
+    def __init__(self, function, write=False):
+        self.__name__ = function.__name__
         self.function = function
 
     def __call__(self, *args, **kwargs):
-        start = perf_counter()
-        self.value = self.function(*args, **kwargs)
-        self.elapsed = float(f"{(perf_counter() - start):.2f}")
-        self.string_elapsed = f"finished in: {self.elapsed}"
-        self.string = f"{self.function.__name__!r} {self.string_elapsed}"
-        self.printer()
-        return self.value
+        try:
+            start = perf_counter()
+            self.value = self.function(*args, **kwargs)
+            self.elapsed = float(f"{(perf_counter() - start):.2f}")
+            self.string_elapsed = f"finished in: {self.elapsed}s"
+            self.string = f"{self.function.__name__!r} {self.string_elapsed}"
+            self.printer()
+            return self.value
+        except ConnectionError as e:
+            print(e)
+        except Exception as e:
+            pass
 
     def printer(self):
-        print(self.string)
+        print(f"{self.string}{self.elapsed}")
 
 
 class ResponseTimer(Timer):
     def printer(self):
         parsed = urlparse(self.value.url)
-        endpoint = parsed.path
+        # print(parsed)
+        # endpoint = parsed.netloc
+        endpoint = ""
+        if parsed.path:
+            endpoint += parsed.path
         if parsed.params:
             endpoint += parsed.params
         if parsed.query:
             endpoint += parsed.query
         endpoint = endpoint.replace("//", "/")
-        print(f"{self.value.status_code}@{endpoint!r} {self.string_elapsed}")
+        print(
+            f"{strftime('[%d/%m/%Y %H:%M:%S]')} {self.value.status_code}@{endpoint!r} {self.string_elapsed} ")
 
 
 def conditional_decorator(decoration, member):
