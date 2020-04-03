@@ -1,18 +1,24 @@
-import subprocess, sys, os, argparse
+from zipfile import ZipFile
+import os, argparse
 
-def unzip(zip=None):
-    if not zip:
+def unzip(zip_file=None):
+    '''
+    Takes an argument (.zip file) from cmd line as required from argparse, or, if imported, takes a path-like string of the .zip file.
+    Unzips using python stdlib zipfile.ZipFile
+    '''
+    if not zip_file:
         parser = argparse.ArgumentParser()
         parser.add_argument("zip", action="store")
         args = parser.parse_args()
-        zipfile = args.zip
+        zip_file = args.zip
     else:
-        zipfile=zip
+        pass
 
     os.chdir(os.getcwd())
-    if os.path.splitext(zipfile)[-1] == '.zip':
-        subprocess.call(f"unzip {zipfile}", shell=True)
-        os.remove(zipfile)
+    if os.path.splitext(zip_file)[-1] == '.zip':
+        with ZipFile(zip_file, 'r') as zip_ref:
+            zip_ref.extractall(os.getcwd())
+        os.remove(zip_file)
     else:
         print('.zip extension file required')
 
