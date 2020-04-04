@@ -25,7 +25,7 @@ class Yify:
         parser.add_argument('--lang', '-l', type=str, action='store', default="English", help='Language of the subtitle to search for')
         parser.add_argument('--debug', '-d', action='store_true', default=False, help='Run debug assist tools')
         parser.add_argument('--resub', '-r', action='store_true', default=False, help=Resub.__doc__)
-        parser.add_argument('--no', '-n', action='store_true', default=False)
+        parser.add_argument('--no', '-n', action='store_true', default=False, help='No-download')
         args = parser.parse_args()
         self.movie = args.movie
         self.lang = args.lang
