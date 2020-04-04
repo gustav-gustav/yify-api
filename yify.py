@@ -18,12 +18,13 @@ except ImportError:
 
 
 class Yify:
+    '''Api that takes a string argument from cmd line to search for subtitles'''
     def __init__(self):
         parser = argparse.ArgumentParser()
-        parser.add_argument('movie', type=str, action='store')
-        parser.add_argument('--lang', '-l', type=str, action='store', default="English")
-        parser.add_argument('--debug', '-d', action='store_true', default=False)
-        parser.add_argument('--resub', '-r', action='store_true', default=False)
+        parser.add_argument('movie', type=str, action='store', help='Required argument. Searches for this given argument in yifysubtitles.com/')
+        parser.add_argument('--lang', '-l', type=str, action='store', default="English", help='Language of the subtitle to search for')
+        parser.add_argument('--debug', '-d', action='store_true', default=False, help='Run debug assist tools')
+        parser.add_argument('--resub', '-r', action='store_true', default=False, help=Resub.__doc__)
         parser.add_argument('--no', '-n', action='store_true', default=False)
         args = parser.parse_args()
         self.movie = args.movie
@@ -46,7 +47,7 @@ class Yify:
             payload = {'q': self.movie}
             response = requests.get(url=url, headers=self.headers, params=urlencode(payload))
 
-            url = self.url(self.search_movie(response)['endpoint'])
+            url = self.url(self.get_movie_endpoint(response))
             response = requests.get(url=url, headers=self.headers)
 
             subtitles = self.search_subtitle(response)
@@ -66,7 +67,8 @@ class Yify:
             print(e)
 
 
-    def search_movie(self, response):
+    def get_movie_endpoint(self, response):
+        '''Parses the response of a GET@yifysubtitles.com/search?q=payload to return the endpoint page of the movie'''
         soup = BeautifulSoup(response.text, 'html.parser')
         movies = soup.findAll("div", {"class": "media-body"})
         ratios = {}
@@ -80,13 +82,15 @@ class Yify:
 
             best_match = max(ratios.keys())
             print(f"Best match for {self.movie!r} found: {ratios[best_match]['name']}")
-            return ratios[best_match]
+            return ratios[best_match]['endpoint']
 
         else:
             print("No movie found in search")
             sys.exit()
 
     def search_subtitle(self, response):
+        '''Parses the response of GET@yifysubtitles.com/{movie_endpoint}.
+           Returns subtitles list containing subtitle dictionaries {"rating": rating, "endpoint": endpoint}'''
         soup = BeautifulSoup(response.text, 'html.parser')
         movies = soup.findAll("tbody")[0].findAll("tr")
         subtitles = []
@@ -117,6 +121,7 @@ class Yify:
             sys.exit
 
     def downloader(self, endpoint):
+        '''GET@yifysubtitles.com/subtitle/{subtitle_endpoint}.zip'''
         url = self.url(endpoint + '.zip')
         with requests.get(url=url, stream=True, allow_redirects=True) as response:
             if response.ok:
@@ -129,6 +134,7 @@ class Yify:
                 sys.exit()
 
     def get_filename(self, content_disposition):
+        '''returns filename embedded in response.headers['content_disposition']'''
         if not content_disposition:
             return None
         fname = re.findall('filename=(.+)', content_disposition)
@@ -137,6 +143,7 @@ class Yify:
         return fname[0]
 
     def url(self, endpoint):
+        '''Appends an endpoint to the base_url'''
         return f"{self.base_url}{endpoint}"
 
 

@@ -3,7 +3,8 @@ import os, argparse
 
 def unzip(zip_file=None):
     '''
-    Takes an argument (.zip file) from cmd line as required from argparse, or, if imported, takes a path-like string of the .zip file.
+    Takes an argument (.zip file) from cmd line as required from argparse or,
+    if imported, takes a path-like string of the .zip file.
     Unzips using python stdlib zipfile.ZipFile
     '''
     if not zip_file:
