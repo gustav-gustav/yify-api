@@ -3,10 +3,22 @@ from functools import wraps
 from urllib.parse import urlparse
 
 
+def timer(function):
+    @wraps(function)
+    def wrapper_timer(*args, **kwargs):
+        start = perf_counter()
+        value = function(*args, **kwargs)
+        elapsed = float(f"{(perf_counter() - start):.2f}")
+        print(f'{function.__name__!r} finished in: {elapsed}' + " "*20)
+        return value
+    return wrapper_timer
+
+
 class Timer:
-    def __init__(self, function, write=False):
-        self.__name__ = function.__name__
+    def __init__(self, function):
+        wraps(function)(self)
         self.function = function
+        self.function_name = function.__name__
 
     def __call__(self, *args, **kwargs):
         try:
@@ -14,7 +26,7 @@ class Timer:
             self.value = self.function(*args, **kwargs)
             self.elapsed = float(f"{(perf_counter() - start):.2f}")
             self.string_elapsed = f"finished in: {self.elapsed}s"
-            self.string = f"{self.function.__name__!r} {self.string_elapsed}"
+            self.string = f"{self.function_name!r} {self.string_elapsed}"
             self.printer()
             return self.value
         except ConnectionError as e:
@@ -22,16 +34,19 @@ class Timer:
         except Exception as e:
             pass
 
-    def printer(self):
-        print(f"{self.string}{self.elapsed}")
+    def __get__(self, instance, cls):
+        if instance is None:
+            return self
+        else:
+            return types.MethodType(self, instance)
 
+    def printer(self):
+        print(f"{self.string_elapsed}")
 
 class ResponseTimer(Timer):
     def printer(self):
         parsed = urlparse(self.value.url)
-        # print(parsed)
-        # endpoint = parsed.netloc
-        endpoint = ""
+        endpoint = parsed.netloc
         if parsed.path:
             endpoint += parsed.path
         if parsed.params:
@@ -41,7 +56,6 @@ class ResponseTimer(Timer):
         endpoint = endpoint.replace("//", "/")
         print(
             f"{strftime('[%d/%m/%Y %H:%M:%S]')} {self.value.status_code}@{endpoint!r} {self.string_elapsed} ")
-
 
 def conditional_decorator(decoration, member):
     def decorator(method):
